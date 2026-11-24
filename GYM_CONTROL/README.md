@@ -38,6 +38,28 @@ java -cp 'bin:recursos:lib/*' aplicacion.App
 java -cp 'bin:recursos:lib/*' pruebas.PruebaModelo
 ```
 
+### Crear un ejecutable portátil de un solo archivo
+
+En Windows con JDK 21, ejecuta desde la carpeta del proyecto:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build-portable.ps1
+java -jar .\dist\GYM_CONTROL_portable.jar
+```
+
+El JAR incluye la aplicación compilada, SQLite JDBC, el esquema y los datos de demostración, las licencias y el código fuente en `META-INF/sources`. En otra PC basta Java 21 para ejecutarlo. Para compilar también el código fuente extraído del mismo JAR, desde la carpeta donde está el proyecto usa PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force fuentes, bin | Out-Null
+Push-Location fuentes
+jar xf ..\dist\GYM_CONTROL_portable.jar META-INF/sources
+Pop-Location
+$fuentesGym = Get-ChildItem -Recurse .\fuentes\META-INF\sources -Filter *.java | ForEach-Object { $_.FullName }+javac --release 21 -encoding UTF-8 -cp .\dist\GYM_CONTROL_portable.jar -d bin $fuentesGym
+java -cp "bin;.\dist\GYM_CONTROL_portable.jar" aplicacion.App
+```
+
+El archivo de base de datos `gym_control.db` se crea localmente en la carpeta desde donde se ejecuta la aplicación; no hace falta instalar ni conectarse a un servidor de base de datos.
+
 ## Datos y recorrido de demostración
 
 La primera ejecución crea `gym_control.db` en el directorio de trabajo, normalmente la carpeta del proyecto en Eclipse. Se inicializa con sedes, socios, planes, membresías, asistencias y clases ficticias. Las ejecuciones siguientes conservan los cambios y no repiten la carga inicial. Para comenzar con otra base vacía, agrega `-Dgym.db=gym_vacio.db -Dgym.sinDemo=true` en **Run Configurations → Arguments → VM arguments**. Los ejemplos dependen de la fecha en que se creó la base.
@@ -45,7 +67,7 @@ La primera ejecución crea `gym_control.db` en el directorio de trabajo, normalm
 | Para mostrar | En la aplicación |
 | --- | --- |
 | Observer | Crea un socio y vuelve a **Inicio**. El total cambia junto con la tabla **Socios**. |
-| Command | En **Socios**, registra un socio. Usa **Deshacer / Rehacer** o **Ctrl+Z / Ctrl+Y** antes de asociarle una membresía. |
+| Command | Registra un socio, una membresía y un abono; usa **Deshacer / Rehacer** o **Ctrl+Z / Ctrl+Y**. En **Pagos**, deshaz un abono y comprueba que vuelve el saldo. |
 | Strategy | Selecciona a Valeria Torres para su primer contrato y elige **Nuevo socio (10 %)**. Para una renovación anticipada, selecciona la membresía de Diego Rivas si le quedan hasta 7 días. |
 | Pago en cuotas | Selecciona la membresía de Camila Salas en **Pagos**. El ejemplo tiene S/ 150.00 de precio, S/ 100.00 abonados y S/ 50.00 de saldo. |
 | Aforo y asistencia | En **Accesos y asistencias**, prueba el DNI ficticio `00000011` en **Arequipa Centro**. Registra su entrada y su salida. |
@@ -60,7 +82,7 @@ La primera ejecución crea `gym_control.db` en el directorio de trabajo, normalm
 - Congelamientos con motivo, reactivación y ajuste de vencimiento. Pagos completos o parciales con historial y saldo.
 - Validación de ingreso por DNI y sede, entradas y salidas con hora y control de aforo.
 - Entrenadores, clases grupales, listado de participantes, reservas y cancelaciones.
-- Inicio con cifras de SQLite, reporte CSV de asistencias y deshacer/rehacer para cambios en socios.
+- Inicio con cifras de SQLite, reporte CSV de asistencias y deshacer/rehacer para cambios en socios, registros de membresía y abonos.
 
 ## Reglas adoptadas
 
@@ -70,7 +92,7 @@ La primera ejecución crea `gym_control.db` en el directorio de trabajo, normalm
 - **Tarifas.** Primera membresía con 10 % de descuento. Renovación con 5 % durante los últimos siete días de vigencia. Primero se valida si corresponde el descuento, luego se guarda el precio acordado. Los importes se guardan en céntimos.
 - **Ingreso.** Requiere socio activo, membresía vigente, al menos 50 % pagado, sede incluida y aforo libre. Cada socio puede tener una sola entrada abierta, con salida en la misma sede. El permiso usa la lista actual de sedes del plan.
 - **Clases.** Se programan a futuro. Un socio activo puede reservar un cupo por clase. Al cancelar se libera el cupo. El aforo de acceso a la sede y los cupos de una clase se administran por separado.
-- **Historial de edición.** Deshacer y rehacer funciona durante la sesión para altas, edición y cambio de estado de socios. El alta solo se puede revertir mientras el socio esté libre de registros dependientes.
+- **Historial de edición.** Deshacer y rehacer funciona durante la sesión para altas, edición y cambio de estado de socios, registros de membresía y abonos. Una membresía no se puede revertir si ya tiene pagos, pausas o asistencias. Las operaciones que todavía no tienen comando limpian el historial para evitar revertir cambios antiguos fuera de orden.
 
 ## Leer el código para exponer
 
@@ -86,7 +108,7 @@ Las entidades principales usan clases con campos privados, constructores y gette
 | `modelo` | Entidades, validación, reglas y consultas de negocio a través de `GymModelo`. |
 | `modelo.persistencia` | Conexión, transacciones, cuatro DAO y exportación CSV. |
 | `modelo.estrategia` | Contrato `EstrategiaPrecio` y las tres tarifas intercambiables. |
-| `modelo.comando` y `util` | Comandos de socios, gestor y dos instancias de `PilaGenerica<Comando>`. |
+| `modelo.comando` y `util` | Comandos de socios, membresías y pagos, gestor y dos instancias de `PilaGenerica<Comando>`. |
 | `controlador` | Recibe los datos de los formularios, coordina llamadas, crea `SwingWorker` y lleva Observer al EDT. |
 | `vista` | Ventana y pestañas, formularios, tabla ordenable, renderer y panel de resumen. |
 | `excepciones` y `pruebas` | Errores de validación y persistencia, y pruebas de consola. |
@@ -95,7 +117,7 @@ Las entidades principales usan clases con campos privados, constructores y gette
 
 **Strategy.** El `JComboBox` entrega un objeto que cumple `EstrategiaPrecio`. El modelo ejecuta `calcular(contexto)` con la tarifa base, el historial y la fecha. La tarifa elegida decide sus propias condiciones.
 
-**Command.** `GestorComandos` invoca `ejecutar()` o `deshacer()` y solo cambia las pilas al confirmarse la operación. Cada comando guarda los datos necesarios para restaurar la operación. El registro rehecho recupera el mismo ID.
+**Command.** `GestorComandos` invoca `ejecutar()` o `deshacer()` y solo cambia las pilas al confirmarse la operación. Los comandos de socios, membresías y pagos guardan los datos necesarios para restaurar la operación y recuperar el mismo ID. Las operaciones no reversibles vacían ambas pilas.
 
 **SOLID.** SRP separa persistencia, reglas y componentes Swing. OCP permite incorporar nuevas estrategias u observadores mediante registro. LSP permite intercambiar estrategias que aplican el mismo contrato de cálculo y validación. ISP mantiene pequeñas las interfaces `GymListener` y `Comando`. DIP se aprecia cuando el modelo usa `EstrategiaPrecio` y el gestor usa `Comando`, ambos a través de interfaces.
 

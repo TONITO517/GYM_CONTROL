@@ -35,4 +35,9 @@ public final class GestorComandos {
     public void descartarRehacer() {
         rehacer.limpiar();
     }
+
+    public void limpiar() {
+        deshacer.limpiar();
+        rehacer.limpiar();
+    }
 }

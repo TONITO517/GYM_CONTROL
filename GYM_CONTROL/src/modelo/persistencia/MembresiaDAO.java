@@ -55,6 +55,26 @@ public final class MembresiaDAO {
                 """, socio, plan, inicio.toString(), fin.toString(), precio, tarifa);
     }
 
+    public void restaurar(Connection conexion, Membresia membresia) throws SQLException {
+        Consultas.actualizar(conexion, """
+                INSERT INTO membresia (id, socio_id, plan_id, inicio, vencimiento, precio, tarifa)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, membresia.getId(), membresia.getSocioId(), membresia.getPlanId(),
+                membresia.getInicio().toString(), membresia.getVencimiento().toString(),
+                membresia.getPrecio(), membresia.getTarifa());
+    }
+
+    public boolean tieneDependencias(Connection conexion, int id) throws SQLException {
+        return Consultas.contar(conexion, """
+                SELECT EXISTS(SELECT 1 FROM congelamiento WHERE membresia_id = ?)
+                    OR EXISTS(SELECT 1 FROM pago WHERE membresia_id = ?)
+                """, id, id) != 0;
+    }
+
+    public void eliminar(Connection conexion, int id) throws SQLException {
+        Consultas.actualizar(conexion, "DELETE FROM membresia WHERE id = ?", id);
+    }
+
     public void congelar(Connection conexion, int id, LocalDate inicio, LocalDate fin, String motivo,
                          LocalDate vencimiento) throws SQLException {
         Consultas.actualizar(conexion, """
@@ -73,10 +93,28 @@ public final class MembresiaDAO {
         Consultas.actualizar(conexion, "UPDATE membresia SET vencimiento = ? WHERE id = ?", vencimiento.toString(), id);
     }
 
-    public void abonar(Connection conexion, int id, LocalDateTime fecha, int monto, Pago.Metodo metodo)
+    public int abonar(Connection conexion, int id, LocalDateTime fecha, int monto, Pago.Metodo metodo)
             throws SQLException {
-        Consultas.actualizar(conexion, "INSERT INTO pago (membresia_id, fecha, monto, metodo) VALUES (?, ?, ?, ?)",
+        return Consultas.insertar(conexion, "INSERT INTO pago (membresia_id, fecha, monto, metodo) VALUES (?, ?, ?, ?)",
                 id, fecha.toString(), monto, metodo.name());
+    }
+
+    public Pago pago(Connection conexion, int id) throws SQLException {
+        return Consultas.uno(conexion, "SELECT * FROM pago WHERE id = ?", datos ->
+                new Pago(datos.getInt("id"), datos.getInt("membresia_id"),
+                        LocalDateTime.parse(datos.getString("fecha")), datos.getInt("monto"),
+                        Pago.Metodo.valueOf(datos.getString("metodo"))), id);
+    }
+
+    public void restaurarPago(Connection conexion, Pago pago) throws SQLException {
+        Consultas.actualizar(conexion, """
+                INSERT INTO pago (id, membresia_id, fecha, monto, metodo) VALUES (?, ?, ?, ?, ?)
+                """, pago.getId(), pago.getMembresiaId(), pago.getFecha().toString(),
+                pago.getMonto(), pago.getMetodo().name());
+    }
+
+    public void eliminarPago(Connection conexion, int id) throws SQLException {
+        Consultas.actualizar(conexion, "DELETE FROM pago WHERE id = ?", id);
     }
 
     public List<Pago> pagos(Connection conexion) throws SQLException {

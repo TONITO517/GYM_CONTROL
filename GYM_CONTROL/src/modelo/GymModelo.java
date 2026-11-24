@@ -232,6 +232,30 @@ public final class GymModelo {
         }
     }
 
+    public void eliminarMembresia(int id) {
+        cambiar(conexion -> {
+            membresia(conexion, id);
+            exigir(!membresias.tieneDependencias(conexion, id)
+                            && !actividad.tieneAsistenciaMembresia(conexion, id),
+                    "No se puede deshacer la membresía porque ya tiene pagos, pausas o asistencias asociadas.");
+            membresias.eliminar(conexion, id);
+            return null;
+        });
+    }
+
+    public void restaurarMembresia(Membresia registrada) {
+        cambiar(conexion -> {
+            exigir(membresias.porId(conexion, registrada.getId()) == null,
+                    "La membresía ya existe y no se puede rehacer.");
+            socio(conexion, registrada.getSocioId());
+            plan(conexion, registrada.getPlanId());
+            comprobarFechas(membresias.porSocio(conexion, registrada.getSocioId()),
+                    registrada.getInicio(), registrada.getVencimiento());
+            membresias.restaurar(conexion, registrada);
+            return null;
+        });
+    }
+
     public void congelar(int id, int dias, String motivo) {
         String motivoLimpio = texto(motivo, "motivo");
         exigir(dias >= 1 && dias <= 90, "Indica entre 1 y 90 días.");
@@ -264,22 +288,46 @@ public final class GymModelo {
 
     // --- Pagos ---
 
-    public void abonar(int membresiaId, int monto, Pago.Metodo metodo) {
-        guardarPago(membresiaId, monto, metodo, false);
+    public int abonar(int membresiaId, int monto, Pago.Metodo metodo) {
+        return guardarPago(membresiaId, monto, metodo, false);
     }
 
-    public void pagarSaldo(int membresiaId, Pago.Metodo metodo) {
-        guardarPago(membresiaId, 0, metodo, true);
+    public int pagarSaldo(int membresiaId, Pago.Metodo metodo) {
+        return guardarPago(membresiaId, 0, metodo, true);
     }
 
-    private void guardarPago(int id, int monto, Pago.Metodo metodo, boolean saldoCompleto) {
+    private int guardarPago(int id, int monto, Pago.Metodo metodo, boolean saldoCompleto) {
         exigir(metodo != null, "Selecciona un método de pago.");
-        cambiar(conexion -> {
+        return cambiar(conexion -> {
             int saldo = membresia(conexion, id).saldo();
             int total = saldoCompleto ? saldo : monto;
             exigir(total > 0, "El importe debe ser positivo y la membresía debe tener saldo.");
             exigir(total <= saldo, "El abono supera el saldo de " + soles(saldo) + ".");
-            membresias.abonar(conexion, id, LocalDateTime.now(reloj), total, metodo);
+            return membresias.abonar(conexion, id, LocalDateTime.now(reloj), total, metodo);
+        });
+    }
+
+    public void eliminarPago(Pago registrado) {
+        cambiar(conexion -> {
+            Pago actual = membresias.pago(conexion, registrado.getId());
+            exigir(actual != null && actual.getMembresiaId() == registrado.getMembresiaId()
+                            && actual.getFecha().equals(registrado.getFecha())
+                            && actual.getMonto() == registrado.getMonto()
+                            && actual.getMetodo() == registrado.getMetodo(),
+                    "El abono cambió desde que se registró y no se puede deshacer.");
+            membresias.eliminarPago(conexion, registrado.getId());
+            return null;
+        });
+    }
+
+    public void restaurarPago(Pago registrado) {
+        cambiar(conexion -> {
+            exigir(membresias.pago(conexion, registrado.getId()) == null,
+                    "El abono ya existe y no se puede rehacer.");
+            Membresia membresia = membresia(conexion, registrado.getMembresiaId());
+            exigir(registrado.getMonto() > 0 && registrado.getMonto() <= membresia.saldo(),
+                    "El saldo cambió y ya no permite rehacer este abono.");
+            membresias.restaurarPago(conexion, registrado);
             return null;
         });
     }

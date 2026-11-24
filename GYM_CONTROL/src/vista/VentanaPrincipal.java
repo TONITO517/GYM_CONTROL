@@ -120,7 +120,8 @@ public final class VentanaPrincipal extends JFrame {
         reglas.addActionListener(evento -> JOptionPane.showMessageDialog(this, """
                 El ingreso requiere una membresía vigente y al menos 50 % pagado.
                 Una renovación empieza al día siguiente del vencimiento, o hoy si ya venció.
-                Deshacer y rehacer se aplican al registro, edición y estado de los socios.
+                Deshacer y rehacer se aplican a socios, membresías y abonos.
+                Las operaciones no reversibles inician un historial nuevo.
                 """, "Reglas del avance", JOptionPane.INFORMATION_MESSAGE));
         archivo.add(reporte);
         archivo.add(cerrar);

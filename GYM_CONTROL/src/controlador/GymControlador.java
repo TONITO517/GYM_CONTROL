@@ -19,6 +19,8 @@ import modelo.comando.Comando;
 import modelo.comando.EditarSocioComando;
 import modelo.comando.GestorComandos;
 import modelo.comando.RegistrarSocioComando;
+import modelo.comando.RegistrarMembresiaComando;
+import modelo.comando.RegistrarPagoComando;
 import modelo.estrategia.DescuentoNuevoSocio;
 import modelo.estrategia.DescuentoRenovacion;
 import modelo.estrategia.EstrategiaPrecio;
@@ -114,11 +116,13 @@ public final class GymControlador {
     }
 
     public void contratar(int socio, int plan, String inicio, EstrategiaPrecio estrategia) {
-        guardar("Membresía registrada", () -> modelo.contratar(socio, plan, Validador.fecha(inicio), estrategia));
+        ejecutar(new RegistrarMembresiaComando(modelo,
+                () -> modelo.contratar(socio, plan, Validador.fecha(inicio), estrategia)));
     }
 
     public void renovar(int socio, int plan, int anterior, EstrategiaPrecio estrategia) {
-        guardar("Renovación registrada", () -> modelo.renovar(socio, plan, anterior, estrategia));
+        ejecutar(new RegistrarMembresiaComando(modelo,
+                () -> modelo.renovar(socio, plan, anterior, estrategia)));
     }
 
     public void congelar(int membresia, String dias, String motivo) {
@@ -133,17 +137,15 @@ public final class GymControlador {
     // --- Pagos, accesos y clases ---
 
     public void pagar(int membresia, String monto, Pago.Metodo metodo, boolean cancelarSaldo) {
-        if (cancelarSaldo) {
-            guardar("Saldo cancelado", () -> modelo.pagarSaldo(membresia, metodo));
-        } else {
-            guardar("Abono registrado", () -> modelo.abonar(membresia, Validador.centimos(monto), metodo));
-        }
+        ejecutar(new RegistrarPagoComando(modelo, () -> cancelarSaldo
+                ? modelo.pagarSaldo(membresia, metodo)
+                : modelo.abonar(membresia, Validador.centimos(monto), metodo)));
     }
 
     public void entrada(String dni, int sede) {
         tarea(() -> {
             modelo.registrarEntrada(dni, sede);
-            comandos.descartarRehacer();
+            comandos.limpiar();
             return "Acceso permitido. Entrada registrada.";
         }, TipoTarea.ACCESO);
     }
@@ -174,7 +176,7 @@ public final class GymControlador {
     private void guardar(String mensaje, Runnable operacion) {
         tarea(() -> {
             operacion.run();
-            comandos.descartarRehacer();
+            comandos.limpiar();
             return mensaje;
         }, TipoTarea.OPERACION);
     }

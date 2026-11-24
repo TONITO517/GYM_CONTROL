@@ -47,6 +47,11 @@ public final class ActividadDAO {
         Consultas.actualizar(conexion, "UPDATE asistencia SET salida = ? WHERE id = ?", hora.toString(), asistencia);
     }
 
+    public boolean tieneAsistenciaMembresia(Connection conexion, int membresiaId) throws SQLException {
+        return Consultas.contar(conexion, "SELECT EXISTS(SELECT 1 FROM asistencia WHERE membresia_id = ?)",
+                membresiaId) != 0;
+    }
+
     private static ClaseGrupal leerClase(ResultSet datos) throws SQLException {
         return new ClaseGrupal(datos.getInt("id"), datos.getString("nombre"), datos.getString("entrenador"),
                 datos.getString("sede"), LocalDateTime.parse(datos.getString("horario")),
