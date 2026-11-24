@@ -1,0 +1,7 @@
+[OK] Las siete pestañas abren con datos SQLite.
+[OK] Formularios de alta y edición, búsqueda, deshacer y rehacer desde Swing.
+[OK] Contratación con Strategy y abono real desde los formularios.
+[OK] Acceso, salida, actualización de aforo y reporte CSV desde la ventana.
+[OK] Registro de entrenador, programación de clase, reserva y cancelación desde Swing.
+[OK] Congelamiento, reactivación y renovación desde Swing.
+[OK] Registro de sede y plan con selección de sede permitida desde Swing.

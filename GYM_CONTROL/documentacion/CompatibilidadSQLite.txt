@@ -1,0 +1,1 @@
+[OK] La revisión leyó socios, membresías y una alta de la versión anterior sin repetir los datos de demostración.

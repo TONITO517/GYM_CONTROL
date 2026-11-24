@@ -1,0 +1,59 @@
+=== PRUEBAS GYM CONTROL ===
+[OK] Registro de socio
+[OK] Observer notifica a dos observadores
+[OK] DNI duplicado
+[OK] Observer no notifica validaciones fallidas
+[OK] Command deshace un registro sin relaciones
+[OK] Command rehace y conserva el ID
+[OK] Command edita datos
+[OK] Command restaura los datos anteriores
+[OK] Acción nueva sustituye el historial de rehacer
+[OK] Estado restaurado y baja de Observer
+[OK] Editar sede
+[OK] Sede inválida en edición de plan
+[OK] El plan previo permanece tras validación
+[OK] Editar plan con sedes
+[OK] Strategy calcula 10 % para socio nuevo
+[OK] Fecha de vencimiento inclusive
+[OK] Estado por vencer calculado por fecha
+[OK] Bloquea contratos superpuestos
+[OK] Bloquea descuento de primera compra cuando ya hay historial
+[OK] Congelamiento y extensión
+[OK] Congelamiento superpuesto
+[OK] Acceso bloqueado por congelamiento
+[OK] Reactivación conserva solo un día efectivo
+[OK] Renovación sin solape con 5 % de descuento
+[OK] Renovación futura aparece programada
+[OK] Congelamiento no invade la próxima membresía
+[OK] No renueva dos veces el mismo periodo
+[OK] Abono parcial y saldo exacto
+[OK] Acceso bloqueado con menos de 50 % abonado
+[OK] Rechaza abono superior al saldo
+[OK] Rechaza abono negativo
+[OK] Un abono de exactamente 50 % habilita el acceso
+[OK] Strategy permite tarifa normal
+[OK] Pago completo del saldo
+[OK] DNI desconocido
+[OK] Sede fuera del plan
+[OK] Membresía vencida
+[OK] Descuento anticipado requiere vigencia
+[OK] Renovación vencida empieza hoy
+[OK] Socio suspendido
+[OK] Entrada incrementa el aforo
+[OK] Entrada duplicada
+[OK] Rechaza por aforo completo
+[OK] Salida en sede distinta
+[OK] Salida libera el aforo
+[OK] Salida duplicada
+[OK] Command protege el socio con historial al deshacer su alta
+[OK] Registro y edición de entrenador
+[OK] Cupos mayores que la capacidad de sede
+[OK] Reserva y cálculo de cupos
+[OK] Reserva duplicada
+[OK] Clase sin cupos
+[OK] Cancelar reserva libera un cupo
+[OK] Dos operaciones concurrentes no superan el último cupo
+[OK] Exportación de asistencias CSV
+[OK] Persistencia de datos tras reabrir SQLite
+[OK] Los datos de demostración se insertan una sola vez
+TOTAL: 57 comprobaciones aprobadas.
