@@ -3,8 +3,11 @@ package modelo;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import modelo.ClaseGrupal.Entrenador;
+import modelo.ClaseGrupal.ReservaClase;
 
 public final class EstadoGym {
+    // Datos del gimnasio
     private final LocalDateTime momento;
     private final List<Socio> socios;
     private final List<Sede> sedes;
@@ -16,6 +19,7 @@ public final class EstadoGym {
     private final List<ClaseGrupal> clases;
     private final List<ReservaClase> reservas;
 
+    // Constructor
     public EstadoGym(LocalDateTime momento, List<Socio> socios, List<Sede> sedes, List<Plan> planes,
             List<Membresia> membresias, List<Pago> pagos, List<Asistencia> asistencias, List<Entrenador> entrenadores,
             List<ClaseGrupal> clases, List<ReservaClase> reservas) {
@@ -31,6 +35,7 @@ public final class EstadoGym {
         this.reservas = List.copyOf(reservas);
     }
 
+    // Getters
     public LocalDateTime getMomento() {
         return momento;
     }
@@ -76,6 +81,7 @@ public final class EstadoGym {
         return momento.toLocalDate();
     }
 
+    // Indicadores del panel de resumen
     public long activos() {
         int cantidad = 0;
         for (Socio socio : socios) {

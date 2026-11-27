@@ -28,9 +28,10 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 import modelo.GymListener;
 
 public final class VentanaPrincipal extends JFrame {
+    // Componentes principales
     private final GymControlador controlador;
     private final JTabbedPane pestanas = new JTabbedPane();
-    private final JLabel mensaje = Tema.etiqueta("Abriendo base de datos…", 13, false, Tema.MUTED);
+    private final JLabel mensaje = PanelModulo.etiqueta("Abriendo base de datos…", 13, false, PanelModulo.MUTED);
     private final JProgressBar progreso = new JProgressBar(0, 100);
     private final JMenuItem deshacer = new JMenuItem("Deshacer");
     private final JMenuItem rehacer = new JMenuItem("Rehacer");
@@ -38,6 +39,7 @@ public final class VentanaPrincipal extends JFrame {
     private final List<GymListener> observadores;
     private final Timer reloj;
 
+    // Constructor de JFrame
     public VentanaPrincipal(GymControlador controlador) {
         super("GYM CONTROL");
         this.controlador = controlador;
@@ -48,14 +50,15 @@ public final class VentanaPrincipal extends JFrame {
         setJMenuBar(menu());
 
         JPanel marca = new JPanel(new BorderLayout());
-        marca.setBackground(Tema.TINTA);
+        marca.setBackground(PanelModulo.TINTA);
         marca.setBorder(BorderFactory.createEmptyBorder(15, 26, 15, 26));
-        var logo = Tema.etiqueta("GYM CONTROL", 25, true, Tema.LIMA);
+        javax.swing.JLabel logo = PanelModulo.etiqueta("GYM CONTROL", 25, true, PanelModulo.LIMA);
         marca.add(logo, BorderLayout.WEST);
-        marca.add(Tema.etiqueta("Gestión de gimnasio", 13, false, Color.WHITE), BorderLayout.EAST);
+        marca.add(PanelModulo.etiqueta("Gestión de gimnasio", 13, false, Color.WHITE), BorderLayout.EAST);
         add(marca, BorderLayout.NORTH);
 
-        PanelResumen resumen = new PanelResumen(controlador, this::exportar);
+        // Creación de paneles observadores
+        PanelResumen resumen = new PanelResumen(controlador, () -> exportar());
         PanelSocios socios = new PanelSocios(controlador, deshacer, rehacer);
         PanelSedes sedes = new PanelSedes(controlador);
         PanelMembresias membresias = new PanelMembresias(controlador);
@@ -63,6 +66,7 @@ public final class VentanaPrincipal extends JFrame {
         accesos = new PanelAccesos(controlador);
         PanelClases clases = new PanelClases(controlador);
         observadores = List.of(resumen, socios, sedes, membresias, pagos, accesos, clases);
+        // Pestañas de la aplicación
         pestanas.addTab("Inicio", resumen);
         pestanas.addTab("Socios", socios);
         pestanas.addTab("Sedes", sedes);
@@ -72,9 +76,10 @@ public final class VentanaPrincipal extends JFrame {
         pestanas.addTab("Entrenadores y clases", clases);
         add(pestanas, BorderLayout.CENTER);
 
+        // Barra de estado y progreso
         JPanel pie = new JPanel(new BorderLayout());
         pie.setBackground(Color.WHITE);
-        pie.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, Tema.LINEA),
+        pie.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, PanelModulo.LINEA),
                 BorderFactory.createEmptyBorder(6, 26, 6, 26)));
         progreso.setStringPainted(true);
         progreso.setVisible(false);
@@ -91,7 +96,7 @@ public final class VentanaPrincipal extends JFrame {
             }
         });
         reloj.start();
-        alCerrar(reloj::stop);
+        alCerrar(() -> reloj.stop());
     }
 
     public List<GymListener> observadores() { return observadores; }
@@ -102,6 +107,7 @@ public final class VentanaPrincipal extends JFrame {
         });
     }
 
+    // Menú y atajos de teclado
     private JMenuBar menu() {
         JMenuBar barra = new JMenuBar();
         JMenu archivo = new JMenu("Archivo");
@@ -134,6 +140,7 @@ public final class VentanaPrincipal extends JFrame {
         return barra;
     }
 
+    // JFileChooser: exportación de archivos
     private void exportar() {
         JFileChooser elegir = new JFileChooser();
         elegir.setDialogTitle("Exportar historial de asistencias");
@@ -149,6 +156,7 @@ public final class VentanaPrincipal extends JFrame {
         controlador.exportarAsistencias(destino.toPath());
     }
 
+    // Estado de la interfaz durante las tareas
     public void ocupada(boolean ocupada, boolean exportando, boolean puedeDeshacer, boolean puedeRehacer) {
         setEnabled(!ocupada);
         deshacer.setEnabled(puedeDeshacer);

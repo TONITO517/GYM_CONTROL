@@ -12,14 +12,15 @@ import modelo.Membresia;
 
 final class PanelResumen extends PanelModulo {
     private final JLabel[] valores = new JLabel[9];
-    private final Tabla<modelo.Sede> sedes = new Tabla<>(Tabla.texto("Sede", modelo.Sede::getNombre),
-            Tabla.numero("Personas dentro", modelo.Sede::getPresentes), Tabla.numero("Capacidad", modelo.Sede::getCapacidad),
-            Tabla.numero("Espacios libres", modelo.Sede::disponibles));
+    private final Tabla<modelo.Sede> sedes = new Tabla<>(Tabla.texto("Sede", elemento -> elemento.getNombre()),
+            Tabla.numero("Personas dentro", elemento -> elemento.getPresentes()), Tabla.numero("Capacidad", elemento -> elemento.getCapacidad()),
+            Tabla.numero("Espacios libres", elemento -> elemento.disponibles()));
 
+    // Constructor del resumen
     PanelResumen(GymControlador controlador, Runnable exportar) {
         super("Resumen del gimnasio", "Consulta socios, vencimientos, pagos y ocupación por sede.");
         accion("Exportar asistencias", true, exportar);
-        accion("Actualizar", false, controlador::actualizar);
+        accion("Actualizar", false, () -> controlador.actualizar());
 
         JPanel cuerpo = new JPanel(new BorderLayout(0, 16));
         cuerpo.setOpaque(false);
@@ -31,10 +32,10 @@ final class PanelResumen extends PanelModulo {
         for (int i = 0; i < nombres.length; i++) {
             JPanel tarjeta = new JPanel(new GridLayout(2, 1, 0, 2));
             tarjeta.setBackground(Color.WHITE);
-            tarjeta.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(Tema.LINEA),
+            tarjeta.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(PanelModulo.LINEA),
                     BorderFactory.createEmptyBorder(9, 15, 9, 15)));
-            tarjeta.add(Tema.etiqueta(nombres[i], 13, true, Tema.MUTED));
-            valores[i] = Tema.etiqueta("—", 26, true, Tema.VERDE);
+            tarjeta.add(PanelModulo.etiqueta(nombres[i], 13, true, PanelModulo.MUTED));
+            valores[i] = PanelModulo.etiqueta("—", 26, true, PanelModulo.VERDE);
             tarjeta.add(valores[i]);
             indicadores.add(tarjeta);
         }
@@ -43,6 +44,7 @@ final class PanelResumen extends PanelModulo {
         add(cuerpo, BorderLayout.CENTER);
     }
 
+    // Observer: actualización de indicadores
     @Override
     public void gymActualizado(EstadoGym estado) {
         this.estado = estado;
@@ -53,6 +55,6 @@ final class PanelResumen extends PanelModulo {
                 estado.porVigencia(Membresia.Vigencia.CONGELADA), estado.pagosPendientes(),
                 estado.presentes(), estado.clasesProgramadas()};
         for (int i = 0; i < cifras.length; i++) valores[i].setText(Long.toString(cifras[i]));
-        sedes.mostrar(estado.getSedes(), modelo.Sede::getId);
+        sedes.mostrar(estado.getSedes(), elemento -> elemento.getId());
     }
 }

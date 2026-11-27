@@ -3,24 +3,21 @@ package controlador;
 import excepciones.DatosInvalidosException;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
-import modelo.Entrenador;
+import modelo.ClaseGrupal.Entrenador;
 import modelo.EstadoGym;
 import modelo.GymListener;
 import modelo.GymModelo;
 import modelo.Pago;
 import modelo.Socio;
 import modelo.Validador;
-import modelo.comando.CambiarEstadoSocioComando;
 import modelo.comando.Comando;
-import modelo.comando.EditarSocioComando;
 import modelo.comando.GestorComandos;
-import modelo.comando.RegistrarSocioComando;
-import modelo.comando.RegistrarMembresiaComando;
-import modelo.comando.RegistrarPagoComando;
+import modelo.comando.MembresiaComando;
+import modelo.comando.PagoComando;
+import modelo.comando.SocioComando;
 import modelo.estrategia.DescuentoNuevoSocio;
 import modelo.estrategia.DescuentoRenovacion;
 import modelo.estrategia.EstrategiaPrecio;
@@ -35,25 +32,33 @@ public final class GymControlador {
     private boolean trabajando;
     private boolean iniciado;
 
+    private interface Tarea {
+        String ejecutar();
+    }
+
     private enum TipoTarea { INICIO, OPERACION, ACCESO, EXPORTACION }
 
+    // Constructor
     public GymControlador(GymModelo modelo) {
         this.modelo = modelo;
     }
 
+    // Registro de observadores
     public void conectar(VentanaPrincipal vista) {
         this.vista = vista;
         for (GymListener observador : vista.observadores()) {
             GymListener enEdt = estado -> avisarEnPantalla(observador, estado);
-            modelo.agregarListener(enEdt);
-            vista.alCerrar(() -> modelo.eliminarListener(enEdt));
+            modelo.agregarObservador(enEdt);
+            vista.alCerrar(() -> modelo.eliminarObservador(enEdt));
         }
     }
 
+    // Notificación en el EDT
     private void avisarEnPantalla(GymListener observador, EstadoGym estado) {
         SwingUtilities.invokeLater(() -> observador.gymActualizado(estado));
     }
 
+    // Carga inicial de datos
     public void iniciar(boolean demostracion) {
         tarea(() -> {
             modelo.inicializar(demostracion);
@@ -69,25 +74,31 @@ public final class GymControlador {
         }, TipoTarea.OPERACION);
     }
 
+    // Strategy: lista de tarifas
     public List<EstrategiaPrecio> estrategias() {
-        return List.of(new PrecioNormal(), new DescuentoNuevoSocio(), new DescuentoRenovacion());
+        List<EstrategiaPrecio> estrategias = new java.util.ArrayList<>();
+        estrategias.add(new PrecioNormal());
+        estrategias.add(new DescuentoNuevoSocio());
+        estrategias.add(new DescuentoRenovacion());
+        return estrategias;
     }
 
     // --- Socios e historial ---
 
     public void registrarSocio(String dni, String nombres, String apellidos, String telefono) {
-        ejecutar(new RegistrarSocioComando(modelo, dni, nombres, apellidos, telefono));
+        ejecutar(new SocioComando(modelo, dni, nombres, apellidos, telefono));
     }
 
     public void editarSocio(Socio anterior, String dni, String nombres, String apellidos, String telefono) {
         Socio nuevo = new Socio(anterior.getId(), dni, nombres, apellidos, telefono, anterior.getFechaRegistro(), anterior.getEstado());
-        ejecutar(new EditarSocioComando(modelo, anterior, nuevo));
+        ejecutar(new SocioComando(modelo, anterior, nuevo));
     }
 
     public void estadoSocio(Socio anterior, Socio.Estado estado) {
-        ejecutar(new CambiarEstadoSocioComando(modelo, anterior, estado));
+        ejecutar(new SocioComando(modelo, anterior, estado));
     }
 
+    // Command: ejecución e historial
     private void ejecutar(Comando comando) {
         tarea(() -> {
             comandos.ejecutar(comando);
@@ -116,13 +127,11 @@ public final class GymControlador {
     }
 
     public void contratar(int socio, int plan, String inicio, EstrategiaPrecio estrategia) {
-        ejecutar(new RegistrarMembresiaComando(modelo,
-                () -> modelo.contratar(socio, plan, Validador.fecha(inicio), estrategia)));
+        ejecutar(new MembresiaComando(modelo, socio, plan, inicio, estrategia));
     }
 
     public void renovar(int socio, int plan, int anterior, EstrategiaPrecio estrategia) {
-        ejecutar(new RegistrarMembresiaComando(modelo,
-                () -> modelo.renovar(socio, plan, anterior, estrategia)));
+        ejecutar(new MembresiaComando(modelo, socio, plan, anterior, estrategia));
     }
 
     public void congelar(int membresia, String dias, String motivo) {
@@ -137,9 +146,7 @@ public final class GymControlador {
     // --- Pagos, accesos y clases ---
 
     public void pagar(int membresia, String monto, Pago.Metodo metodo, boolean cancelarSaldo) {
-        ejecutar(new RegistrarPagoComando(modelo, () -> cancelarSaldo
-                ? modelo.pagarSaldo(membresia, metodo)
-                : modelo.abonar(membresia, Validador.centimos(monto), metodo)));
+        ejecutar(new PagoComando(modelo, membresia, monto, metodo, cancelarSaldo));
     }
 
     public void entrada(String dni, int sede) {
@@ -181,12 +188,13 @@ public final class GymControlador {
         }, TipoTarea.OPERACION);
     }
 
-    private void tarea(Callable<String> operacion, TipoTarea tipo) {
+    // SwingWorker: operaciones en segundo plano
+    private void tarea(Tarea operacion, TipoTarea tipo) {
         if (!puedeIniciar(tipo)) return;
         iniciarTarea(tipo);
         new SwingWorker<String, Void>() {
             @Override protected String doInBackground() throws Exception {
-                return operacion.call();
+                return operacion.ejecutar();
             }
 
             @Override protected void done() {
@@ -195,12 +203,13 @@ public final class GymControlador {
         }.execute();
     }
 
+    // SwingWorker: exportación CSV
     public void exportarAsistencias(Path archivo) {
         if (!puedeIniciar(TipoTarea.EXPORTACION)) return;
         iniciarTarea(TipoTarea.EXPORTACION);
         SwingWorker<String, Void> trabajador = new SwingWorker<>() {
             @Override protected String doInBackground() throws Exception {
-                ExportadorCsv.asistencias(archivo, modelo.consultar().getAsistencias(), this::setProgress);
+                ExportadorCsv.asistencias(archivo, modelo.consultar().getAsistencias(), valor -> setProgress(valor));
                 return "Reporte guardado en " + archivo.getFileName();
             }
 
@@ -223,6 +232,7 @@ public final class GymControlador {
         vista.ocupada(true, tipo == TipoTarea.EXPORTACION, false, false);
     }
 
+    // Resultado de la tarea y manejo de errores
     private void terminar(SwingWorker<String, Void> trabajador, TipoTarea tipo) {
         trabajando = false;
         String mensaje;

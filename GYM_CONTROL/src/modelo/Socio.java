@@ -5,6 +5,7 @@ import java.time.LocalDate;
 public final class Socio {
     public enum Estado { ACTIVO, SUSPENDIDO }
 
+    // Atributos
     private final int id;
     private final String dni;
     private final String nombres;
@@ -13,6 +14,7 @@ public final class Socio {
     private final LocalDate fechaRegistro;
     private final Estado estado;
 
+    // Constructor
     public Socio(int id, String dni, String nombres, String apellidos,
             String telefono, LocalDate fechaRegistro, Estado estado) {
         this.id = id;
@@ -24,6 +26,7 @@ public final class Socio {
         this.estado = estado;
     }
 
+    // Getters
     public int getId() {
         return id;
     }

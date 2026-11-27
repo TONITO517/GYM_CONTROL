@@ -13,17 +13,15 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
-import modelo.Entrenador;
+import modelo.ClaseGrupal.Entrenador;
 import modelo.GymListener;
 import modelo.GymModelo;
 import modelo.Membresia;
 import modelo.Pago;
 import modelo.Sede;
 import modelo.Socio;
-import modelo.comando.CambiarEstadoSocioComando;
-import modelo.comando.EditarSocioComando;
 import modelo.comando.GestorComandos;
-import modelo.comando.RegistrarSocioComando;
+import modelo.comando.SocioComando;
 import modelo.estrategia.DescuentoNuevoSocio;
 import modelo.estrategia.DescuentoRenovacion;
 import modelo.estrategia.PrecioNormal;
@@ -34,6 +32,7 @@ public final class PruebaModelo {
 
     private PruebaModelo() {}
 
+    // Inicio de las pruebas
     public static void main(String[] args) throws Exception {
         System.out.println("=== PRUEBAS GYM CONTROL ===");
         Path carpeta = Files.createTempDirectory("prueba-gym-");
@@ -41,13 +40,14 @@ public final class PruebaModelo {
             probar(carpeta);
             System.out.println("TOTAL: " + comprobaciones + " comprobaciones aprobadas.");
         } finally {
-            try (var archivos = Files.list(carpeta)) {
+            try (java.util.stream.Stream<Path> archivos = Files.list(carpeta)) {
                 for (Path archivo : archivos.toList()) Files.delete(archivo);
             }
             Files.delete(carpeta);
         }
     }
 
+    // Pruebas de las operaciones del modelo
     private static void probar(Path carpeta) throws Exception {
         Path archivo = carpeta.resolve("prueba.db");
         RelojPrueba reloj = new RelojPrueba();
@@ -58,18 +58,18 @@ public final class PruebaModelo {
         AtomicInteger avisosSegundo = new AtomicInteger();
         GymListener primero = estado -> avisosPrimero.incrementAndGet();
         GymListener segundo = estado -> avisosSegundo.incrementAndGet();
-        gym.agregarListener(primero);
-        gym.agregarListener(segundo);
+        gym.agregarObservador(primero);
+        gym.agregarObservador(segundo);
 
         GestorComandos comandos = new GestorComandos();
-        var alta = new RegistrarSocioComando(gym, "00000001", "Ana", "Quispe", "900000001");
+        SocioComando alta = new SocioComando(gym, "00000001", "Ana", "Quispe", "900000001");
         comandos.ejecutar(alta);
         Socio ana = gym.consultar().getSocios().getFirst();
         verificar(ana.getDni().equals("00000001") && ana.getFechaRegistro().equals(hoy), "Registro de socio");
         verificar(avisosPrimero.get() == 1 && avisosSegundo.get() == 1, "Observer notifica a dos observadores");
         rechazar(() -> gym.registrarSocio("00000001", "Otra", "Persona", "900000002"), "DNI duplicado");
         verificar(avisosPrimero.get() == 1 && avisosSegundo.get() == 1, "Observer no notifica validaciones fallidas");
-        gym.eliminarListener(segundo);
+        gym.eliminarObservador(segundo);
 
         comandos.deshacer();
         verificar(gym.consultar().getSocios().isEmpty(),
@@ -79,11 +79,11 @@ public final class PruebaModelo {
                 "Command rehace y conserva el ID");
         Socio anaEditada = new Socio(ana.getId(), ana.getDni(), ana.getNombres(), ana.getApellidos(), "911000001",
                 ana.getFechaRegistro(), ana.getEstado());
-        comandos.ejecutar(new EditarSocioComando(gym, ana, anaEditada));
+        comandos.ejecutar(new SocioComando(gym, ana, anaEditada));
         verificar(gym.consultar().getSocios().getFirst().mismosDatos(anaEditada), "Command edita datos");
         comandos.deshacer();
         verificar(gym.consultar().getSocios().getFirst().mismosDatos(ana), "Command restaura los datos anteriores");
-        comandos.ejecutar(new CambiarEstadoSocioComando(gym, ana, Socio.Estado.SUSPENDIDO));
+        comandos.ejecutar(new SocioComando(gym, ana, Socio.Estado.SUSPENDIDO));
         verificar(gym.consultar().activos() == 0 && !comandos.puedeRehacer(), "Acción nueva sustituye el historial de rehacer");
         comandos.deshacer();
         verificar(gym.consultar().activos() == 1 && avisosSegundo.get() == 1, "Estado restaurado y baja de Observer");
@@ -167,7 +167,7 @@ public final class PruebaModelo {
         gym.registrarSalida(ana.getDni(), centro);
         verificar(gym.consultar().presentes() == 0, "Salida libera el aforo");
         rechazar(() -> gym.registrarSalida(ana.getDni(), centro), "Salida duplicada");
-        rechazar(comandos::deshacer, "Command protege el socio con historial al deshacer su alta");
+        rechazar(() -> comandos.deshacer(), "Command protege el socio con historial al deshacer su alta");
 
         int entrenador = gym.guardarEntrenador(new Entrenador(0, "Ana", "Pérez", "Yoga", "900000099", "Tarde"));
         gym.guardarEntrenador(new Entrenador(entrenador, "Ana", "Pérez", "Yoga", "900000099", "Mañana"));
@@ -185,7 +185,7 @@ public final class PruebaModelo {
         probarCupoConcurrente(archivo, reloj, clase, ana.getId(), diego.getId());
         Path csv = carpeta.resolve("asistencias.csv");
         AtomicInteger progreso = new AtomicInteger();
-        ExportadorCsv.asistencias(csv, gym.consultar().getAsistencias(), progreso::set);
+        ExportadorCsv.asistencias(csv, gym.consultar().getAsistencias(), valor -> progreso.set(valor));
         verificar(progreso.get() == 100 && Files.readString(csv).contains("Ana Quispe"), "Exportación de asistencias CSV");
         GymModelo reabierto = new GymModelo(archivo, reloj);
         reabierto.inicializar(false);
@@ -200,14 +200,15 @@ public final class PruebaModelo {
                 "Los datos de demostración se insertan una sola vez");
     }
 
+    // Prueba de reservas simultáneas
     private static void probarCupoConcurrente(Path archivo, Clock reloj, int clase, int primero, int segundo)
             throws Exception {
         GymModelo instancia1 = new GymModelo(archivo, reloj);
         GymModelo instancia2 = new GymModelo(archivo, reloj);
         CountDownLatch salida = new CountDownLatch(1);
-        try (var ejecutor = Executors.newFixedThreadPool(2)) {
-            var intento1 = ejecutor.submit(() -> competir(salida, instancia1, clase, primero));
-            var intento2 = ejecutor.submit(() -> competir(salida, instancia2, clase, segundo));
+        try (java.util.concurrent.ExecutorService ejecutor = Executors.newFixedThreadPool(2)) {
+            java.util.concurrent.Future<?> intento1 = ejecutor.submit(() -> competir(salida, instancia1, clase, primero));
+            java.util.concurrent.Future<?> intento2 = ejecutor.submit(() -> competir(salida, instancia2, clase, segundo));
             salida.countDown();
             verificar(intento1.get() != intento2.get(), "Dos operaciones concurrentes no superan el último cupo");
         }
@@ -232,6 +233,7 @@ public final class PruebaModelo {
         throw new AssertionError("No se encontró la membresía " + id);
     }
 
+    // Comprobación de datos inválidos
     private static void rechazar(Runnable operacion, String prueba) {
         try {
             operacion.run();
@@ -241,6 +243,7 @@ public final class PruebaModelo {
         }
     }
 
+    // Verificación de resultados
     private static void verificar(boolean condicion, String prueba) {
         if (!condicion) throw new AssertionError(prueba);
         comprobaciones++;

@@ -13,10 +13,12 @@ import vista.VentanaPrincipal;
 public final class App {
     private App() {}
 
+    // Inicio del programa (EDT)
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(App::abrirVentana);
+        SwingUtilities.invokeLater(() -> abrirVentana());
     }
 
+    // Conexión del Modelo, Vista y Controlador
     private static void abrirVentana() {
         configurarInterfaz();
         Path archivo = Path.of(System.getProperty("gym.db", "gym_control.db"));
@@ -28,6 +30,7 @@ public final class App {
         controlador.iniciar(!Boolean.getBoolean("gym.sinDemo"));
     }
 
+    // Configuración visual
     private static void configurarInterfaz() {
         FontUIResource fuente = new FontUIResource(Font.SANS_SERIF, Font.PLAIN, 13);
         for (Object clave : UIManager.getLookAndFeelDefaults().keySet()) {

@@ -3,10 +3,12 @@ package modelo;
 import java.time.LocalDate;
 
 public final class Membresia {
+    // Estados de vigencia
     public enum Vigencia {
         PROGRAMADA, VIGENTE, POR_VENCER, VENCIDA, CONGELADA
     }
 
+    // Atributos
     private final int id;
     private final int socioId;
     private final int planId;
@@ -19,6 +21,7 @@ public final class Membresia {
     private final String tarifa;
     private final Congelamiento congelamiento;
 
+    // Constructor
     public Membresia(int id, int socioId, int planId, String socio,
             String plan, LocalDate inicio, LocalDate vencimiento, int precio,
             int pagado, String tarifa, Congelamiento congelamiento) {
@@ -35,6 +38,7 @@ public final class Membresia {
         this.congelamiento = congelamiento;
     }
 
+    // Getters
     public int getId() {
         return id;
     }
@@ -81,6 +85,7 @@ public final class Membresia {
 
 
 
+    // Saldo y estado del pago
     public int saldo() {
         return precio - pagado;
     }
@@ -91,11 +96,13 @@ public final class Membresia {
         return "Pendiente";
     }
 
+    // Abono mínimo
     public boolean abonoSuficiente() {
         // Redondea hacia arriba al céntimo el mínimo de 50 %.
         return pagado >= precio / 2 + precio % 2;
     }
 
+    // Cálculo de vigencia
     public Vigencia vigencia(LocalDate hoy) {
         if (hoy.isBefore(inicio)) return Vigencia.PROGRAMADA;
         if (hoy.isAfter(vencimiento)) return Vigencia.VENCIDA;
@@ -111,8 +118,51 @@ public final class Membresia {
         return estado == Vigencia.VIGENTE || estado == Vigencia.POR_VENCER;
     }
 
+    // Texto para mostrar la membresía
     @Override
     public String toString() {
         return "#" + id + " · " + socio + " · " + plan;
+    }
+
+    // Datos relacionados con membresia
+    public static final class Congelamiento {
+        private final int id;
+        private final int membresiaId;
+        private final LocalDate inicio;
+        private final LocalDate fin;
+        private final String motivo;
+
+        public Congelamiento(int id, int membresiaId, LocalDate inicio, LocalDate fin, String motivo) {
+            this.id = id;
+            this.membresiaId = membresiaId;
+            this.inicio = inicio;
+            this.fin = fin;
+            this.motivo = motivo;
+        }
+
+        public int getId() {
+            return id;
+        }
+
+        public int getMembresiaId() {
+            return membresiaId;
+        }
+
+        public LocalDate getInicio() {
+            return inicio;
+        }
+
+        public LocalDate getFin() {
+            return fin;
+        }
+
+        public String getMotivo() {
+            return motivo;
+        }
+
+
+        public boolean activoEn(LocalDate dia) {
+            return !dia.isBefore(inicio) && dia.isBefore(fin);
+        }
     }
 }

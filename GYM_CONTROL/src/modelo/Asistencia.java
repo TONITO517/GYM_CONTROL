@@ -3,6 +3,7 @@ package modelo;
 import java.time.LocalDateTime;
 
 public final class Asistencia {
+    // Atributos
     private final int id;
     private final int socioId;
     private final int membresiaId;
@@ -12,6 +13,7 @@ public final class Asistencia {
     private final LocalDateTime entrada;
     private final LocalDateTime salida;
 
+    // Constructor
     public Asistencia(int id, int socioId, int membresiaId, int sedeId,
             String socio, String sede, LocalDateTime entrada, LocalDateTime salida) {
         this.id = id;
@@ -24,6 +26,7 @@ public final class Asistencia {
         this.salida = salida;
     }
 
+    // Getters
     public int getId() {
         return id;
     }

@@ -1,12 +1,14 @@
 package modelo.comando;
 
-import util.PilaGenerica;
 import modelo.Validador;
+import util.PilaGenerica;
 
 public final class GestorComandos {
+    // Pilas para deshacer y rehacer
     private final PilaGenerica<Comando> deshacer = new PilaGenerica<>();
     private final PilaGenerica<Comando> rehacer = new PilaGenerica<>();
 
+    // Ejecución de un comando
     public void ejecutar(Comando comando) {
         comando.ejecutar();
         deshacer.apilar(comando);
@@ -16,6 +18,7 @@ public final class GestorComandos {
     public boolean puedeDeshacer() { return !deshacer.vacia(); }
     public boolean puedeRehacer() { return !rehacer.vacia(); }
 
+    // Deshacer la última operación
     public String deshacer() {
         Validador.exigir(puedeDeshacer(), "No hay cambios que deshacer.");
         Comando comando = deshacer.cima();
@@ -24,6 +27,7 @@ public final class GestorComandos {
         return comando.descripcion();
     }
 
+    // Rehacer la última operación
     public String rehacer() {
         Validador.exigir(puedeRehacer(), "No hay cambios que rehacer.");
         Comando comando = rehacer.cima();
@@ -32,6 +36,7 @@ public final class GestorComandos {
         return comando.descripcion();
     }
 
+    // Limpieza del historial
     public void descartarRehacer() {
         rehacer.limpiar();
     }

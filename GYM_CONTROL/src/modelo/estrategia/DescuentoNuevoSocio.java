@@ -3,6 +3,7 @@ package modelo.estrategia;
 import modelo.Validador;
 
 public final class DescuentoNuevoSocio implements EstrategiaPrecio {
+    // Porcentaje de descuento
     private static final int DESCUENTO = 10;
 
     @Override
@@ -10,6 +11,7 @@ public final class DescuentoNuevoSocio implements EstrategiaPrecio {
         return "Nuevo socio (" + DESCUENTO + " %)";
     }
 
+    // Cálculo y validación del primer contrato
     @Override
     public int calcular(Contexto contexto) {
         Validador.exigir(contexto.esPrimeraMembresia(),

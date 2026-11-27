@@ -9,22 +9,20 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import modelo.ClaseGrupal.Entrenador;
+import modelo.Membresia.Congelamiento;
 import modelo.estrategia.EstrategiaPrecio;
-import modelo.persistencia.ActividadDAO;
-import modelo.persistencia.CatalogoDAO;
+import modelo.persistencia.CatalogoActividadDAO;
 import modelo.persistencia.ConexionSqlite;
-import modelo.persistencia.MembresiaDAO;
-import modelo.persistencia.SocioDAO;
-
+import modelo.persistencia.SocioMembresiaDAO;
 import static modelo.Validador.*;
 
 public final class GymModelo {
-    private final List<GymListener> listeners = new ArrayList<>();
+    // Lista de observadores (Observer).
+    private final List<GymListener> listaObservadores = new ArrayList<>();
     private final ConexionSqlite base;
-    private final SocioDAO socios = new SocioDAO();
-    private final CatalogoDAO catalogo = new CatalogoDAO();
-    private final MembresiaDAO membresias = new MembresiaDAO();
-    private final ActividadDAO actividad = new ActividadDAO();
+    private final SocioMembresiaDAO membresias = new SocioMembresiaDAO();
+    private final CatalogoActividadDAO actividad = new CatalogoActividadDAO();
     private final Clock reloj;
 
     // El resultado y los datos para la pantalla salen de la misma transacción.
@@ -38,6 +36,7 @@ public final class GymModelo {
         }
     }
 
+    // Constructor e inicialización
     public GymModelo(Path archivo, Clock reloj) {
         base = new ConexionSqlite(archivo);
         this.reloj = reloj;
@@ -49,22 +48,25 @@ public final class GymModelo {
 
     // --- Observadores y carga de datos ---
 
-    public synchronized void agregarListener(GymListener listener) {
-        listeners.add(listener);
+    // Alta de observadores
+    public synchronized void agregarObservador(GymListener observador) {
+        listaObservadores.add(observador);
     }
 
-    public synchronized void eliminarListener(GymListener listener) {
-        listeners.remove(listener);
+    // Baja de observadores
+    public synchronized void eliminarObservador(GymListener observador) {
+        listaObservadores.remove(observador);
     }
 
-    private void notificarCambios(EstadoGym estado) {
+    // Notificación de observadores
+    private void notificarObservadores(EstadoGym estado) {
         List<GymListener> observadores;
         synchronized (this) {
-            observadores = List.copyOf(listeners);
+            observadores = new ArrayList<>(listaObservadores);
         }
-        for (GymListener listener : observadores) {
+        for (GymListener observador : observadores) {
             try {
-                listener.gymActualizado(estado);
+                observador.gymActualizado(estado);
             } catch (RuntimeException error) {
                 // Un error de un observador no invalida una operación ya confirmada.
                 System.getLogger(GymModelo.class.getName()).log(System.Logger.Level.ERROR, "Error de observador", error);
@@ -72,29 +74,30 @@ public final class GymModelo {
         }
     }
 
+    // Transacción y notificación de cambios
     private <T> T cambiar(ConexionSqlite.Operacion<T> operacion) {
         Cambio<T> cambio = base.transaccion(conexion -> {
             T resultado = operacion.ejecutar(conexion);
             return new Cambio<>(resultado, leerEstado(conexion));
         });
         // La base ya confirmó el cambio cuando se avisa a las vistas.
-        notificarCambios(cambio.estado);
+        notificarObservadores(cambio.estado);
         return cambio.resultado;
     }
 
     private EstadoGym leerEstado(Connection conexion) throws SQLException {
-        return new EstadoGym(LocalDateTime.now(reloj), socios.listar(conexion), catalogo.sedes(conexion),
-                catalogo.planes(conexion), membresias.listar(conexion), membresias.pagos(conexion),
-                actividad.asistencias(conexion), catalogo.entrenadores(conexion), actividad.clases(conexion),
+        return new EstadoGym(LocalDateTime.now(reloj), membresias.listarSocios(conexion), actividad.sedes(conexion),
+                actividad.planes(conexion), membresias.listar(conexion), membresias.pagos(conexion),
+                actividad.asistencias(conexion), actividad.entrenadores(conexion), actividad.clases(conexion),
                 actividad.reservas(conexion));
     }
 
     public EstadoGym consultar() {
-        return base.transaccion(this::leerEstado);
+        return base.transaccion(conexion -> leerEstado(conexion));
     }
 
     public void actualizarVistas() {
-        notificarCambios(consultar());
+        notificarObservadores(consultar());
     }
 
     // --- Socios y acciones con historial ---
@@ -106,8 +109,8 @@ public final class GymModelo {
     public Socio insertarSocio(Socio socio) {
         Socio limpio = validarSocio(socio);
         return cambiar(conexion -> {
-            exigir(socios.porDni(conexion, limpio.getDni()) == null, "El DNI ya pertenece a un socio.");
-            int id = socios.insertar(conexion, limpio);
+            exigir(membresias.socioPorDni(conexion, limpio.getDni()) == null, "El DNI ya pertenece a un socio.");
+            int id = membresias.insertarSocio(conexion, limpio);
             return socio(conexion, id);
         });
     }
@@ -123,9 +126,9 @@ public final class GymModelo {
         exigir(anterior.getId() == limpio.getId(), "Los cambios deben corresponder al mismo socio.");
         return cambiar(conexion -> {
             exigir(socio(conexion, anterior.getId()).mismosDatos(anterior), "El socio cambió. Actualiza la lista y vuelve a intentar.");
-            Socio titularDni = socios.porDni(conexion, limpio.getDni());
+            Socio titularDni = membresias.socioPorDni(conexion, limpio.getDni());
             exigir(titularDni == null || titularDni.getId() == limpio.getId(), "El DNI ya pertenece a otro socio.");
-            socios.actualizar(conexion, limpio);
+            membresias.actualizarSocio(conexion, limpio);
             return socio(conexion, limpio.getId());
         });
     }
@@ -133,9 +136,9 @@ public final class GymModelo {
     public void eliminarRegistroSocio(Socio registrado) {
         cambiar(conexion -> {
             exigir(socio(conexion, registrado.getId()).mismosDatos(registrado), "El socio cambió desde el registro.");
-            exigir(!socios.tieneHistorial(conexion, registrado.getId()),
+            exigir(!membresias.tieneHistorial(conexion, registrado.getId()),
                     "El socio ya tiene membresías, asistencias o reservas asociadas. Puedes suspenderlo.");
-            socios.eliminar(conexion, registrado.getId());
+            membresias.eliminarSocio(conexion, registrado.getId());
             return null;
         });
     }
@@ -147,13 +150,13 @@ public final class GymModelo {
         String direccionLimpia = texto(direccion, "dirección");
         exigir(capacidad > 0, "La capacidad debe ser mayor que cero.");
         return cambiar(conexion -> {
-            exigir(!catalogo.sedeRepetida(conexion, nombreLimpio, id), "Ya existe una sede con ese nombre.");
+            exigir(!actividad.sedeRepetida(conexion, nombreLimpio, id), "Ya existe una sede con ese nombre.");
             if (id != 0) {
                 exigir(capacidad >= sede(conexion, id).getPresentes(), "La capacidad es menor al aforo registrado.");
                 exigir(capacidad >= actividad.capacidadClasesFuturas(conexion, id, LocalDateTime.now(reloj)),
                         "La capacidad es menor a los cupos de una clase programada.");
             }
-            return catalogo.guardarSede(conexion, id, nombreLimpio, direccionLimpia, capacidad);
+            return actividad.guardarSede(conexion, id, nombreLimpio, direccionLimpia, capacidad);
         });
     }
 
@@ -167,10 +170,10 @@ public final class GymModelo {
         exigir(precio > 0, "El precio debe ser positivo.");
         exigir(!permitidas.isEmpty(), "Elige al menos una sede permitida.");
         return cambiar(conexion -> {
-            exigir(!catalogo.planRepetido(conexion, nombreLimpio, id), "Ya existe un plan con ese nombre.");
+            exigir(!actividad.planRepetido(conexion, nombreLimpio, id), "Ya existe un plan con ese nombre.");
             if (id != 0) plan(conexion, id);
             for (int sedeId : permitidas) sede(conexion, sedeId);
-            return catalogo.guardarPlan(conexion, id, nombreLimpio, meses, precio, permitidas);
+            return actividad.guardarPlan(conexion, id, nombreLimpio, meses, precio, permitidas);
         });
     }
 
@@ -186,6 +189,7 @@ public final class GymModelo {
         return registrarMembresia(socioId, planId, anteriorId, null, estrategia);
     }
 
+    // Registro de membresía y cálculo de tarifa
     private int registrarMembresia(int socioId, int planId, int anteriorId, LocalDate inicio,
                                    EstrategiaPrecio estrategia) {
         exigir(estrategia != null, "Selecciona una tarifa.");
@@ -202,9 +206,11 @@ public final class GymModelo {
             LocalDate fin = fechaInicio.plusMonths(plan.getMeses()).minusDays(1);
             comprobarFechas(historial, fechaInicio, fin);
 
+            // Datos para el cálculo de Strategy
             EstrategiaPrecio.Contexto contexto =
                     new EstrategiaPrecio.Contexto(plan.getPrecio(),
                             historial.isEmpty(), anterior, hoy);
+            // Strategy: el algoritmo depende de la tarifa elegida.
             int importe = estrategia.calcular(contexto);
             exigir(importe > 0, "La tarifa debe producir un precio positivo.");
             return membresias.guardar(conexion, socioId, planId,
@@ -212,6 +218,7 @@ public final class GymModelo {
         });
     }
 
+    // Fechas de renovación
     private LocalDate inicioRenovacion(Membresia anterior, List<Membresia> historial, int socioId, LocalDate hoy) {
         exigir(anterior.getSocioId() == socioId && historial.get(0).getId() == anterior.getId(),
                 "Solo se puede renovar la última membresía del socio.");
@@ -232,6 +239,7 @@ public final class GymModelo {
         }
     }
 
+    // Operaciones para deshacer y rehacer membresías
     public void eliminarMembresia(int id) {
         cambiar(conexion -> {
             membresia(conexion, id);
@@ -256,6 +264,7 @@ public final class GymModelo {
         });
     }
 
+    // Congelamiento y reactivación
     public void congelar(int id, int dias, String motivo) {
         String motivoLimpio = texto(motivo, "motivo");
         exigir(dias >= 1 && dias <= 90, "Indica entre 1 y 90 días.");
@@ -388,8 +397,8 @@ public final class GymModelo {
                 texto(datos.getApellidos(), "apellidos"), texto(datos.getEspecialidad(), "especialidad"),
                 texto(datos.getTelefono(), "teléfono"), texto(datos.getDisponibilidad(), "disponibilidad"));
         return cambiar(conexion -> {
-            exigir(limpio.getId() == 0 || catalogo.existeEntrenador(conexion, limpio.getId()), "Entrenador no encontrado.");
-            return catalogo.guardarEntrenador(conexion, limpio);
+            exigir(limpio.getId() == 0 || actividad.existeEntrenador(conexion, limpio.getId()), "Entrenador no encontrado.");
+            return actividad.guardarEntrenador(conexion, limpio);
         });
     }
 
@@ -399,7 +408,7 @@ public final class GymModelo {
                 "Programa la clase para una fecha y hora futuras.");
         exigir(capacidad > 0, "Los cupos deben ser mayores que cero.");
         return cambiar(conexion -> {
-            exigir(catalogo.existeEntrenador(conexion, entrenadorId), "Entrenador no encontrado.");
+            exigir(actividad.existeEntrenador(conexion, entrenadorId), "Entrenador no encontrado.");
             exigir(capacidad <= sede(conexion, sedeId).getCapacidad(), "Los cupos exceden la capacidad de la sede.");
             return actividad.guardarClase(conexion, nombreLimpio, entrenadorId, sedeId, horario, capacidad);
         });
@@ -426,20 +435,21 @@ public final class GymModelo {
         });
     }
 
+    // Búsquedas y validación de registros
     private Socio socio(Connection conexion, int id) throws SQLException {
-        return encontrado(socios.porId(conexion, id), "Socio no encontrado.");
+        return encontrado(membresias.socioPorId(conexion, id), "Socio no encontrado.");
     }
 
     private Socio socioPorDni(Connection conexion, String dni) throws SQLException {
-        return encontrado(socios.porDni(conexion, dni), "DNI no registrado.");
+        return encontrado(membresias.socioPorDni(conexion, dni), "DNI no registrado.");
     }
 
     private Sede sede(Connection conexion, int id) throws SQLException {
-        return encontrado(catalogo.sede(conexion, id), "Sede no encontrada.");
+        return encontrado(actividad.sede(conexion, id), "Sede no encontrada.");
     }
 
     private Plan plan(Connection conexion, int id) throws SQLException {
-        return encontrado(catalogo.plan(conexion, id), "Plan no encontrado.");
+        return encontrado(actividad.plan(conexion, id), "Plan no encontrado.");
     }
 
     private Membresia membresia(Connection conexion, int id) throws SQLException {

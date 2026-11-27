@@ -14,6 +14,7 @@ import modelo.Asistencia;
 public final class ExportadorCsv {
     private ExportadorCsv() {}
 
+    // Exportación de asistencias
     public static void asistencias(Path destino, List<Asistencia> filas, IntConsumer progreso) throws IOException {
         Path archivo = destino.toAbsolutePath();
         Path temporal = Files.createTempFile(archivo.getParent(), "gym-reporte-", ".tmp");
@@ -22,6 +23,7 @@ public final class ExportadorCsv {
                 salida.write("ID,Socio,Sede,Entrada,Salida");
                 salida.newLine();
                 int escritas = 0;
+                // Escritura de filas CSV
                 for (Asistencia fila : filas) {
                     String fin = fila.getSalida() == null ? "" : fila.getSalida().toString();
                     salida.write(fila.getId() + "," + celda(fila.getSocio()) + "," + celda(fila.getSede())
@@ -31,6 +33,7 @@ public final class ExportadorCsv {
                 }
             }
             try {
+                // Guardado del archivo
                 Files.move(temporal, archivo, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
             } catch (AtomicMoveNotSupportedException error) {
                 Files.move(temporal, archivo, StandardCopyOption.REPLACE_EXISTING);
@@ -41,6 +44,7 @@ public final class ExportadorCsv {
         }
     }
 
+    // Formato de celdas CSV
     private static String celda(String texto) {
         String limpio = texto.stripLeading();
         if (!limpio.isEmpty() && "=+-@".indexOf(limpio.charAt(0)) >= 0) texto = "'" + texto;

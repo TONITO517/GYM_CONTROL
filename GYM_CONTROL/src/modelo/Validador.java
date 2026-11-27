@@ -10,12 +10,14 @@ import java.util.Locale;
 public final class Validador {
     private Validador() {}
 
+    // Validación y excepción propia
     public static void exigir(boolean condicion, String mensaje) {
         if (!condicion) {
             throw new DatosInvalidosException(mensaje);
         }
     }
 
+    // Validación de texto y DNI
     public static String texto(String valor, String campo) {
         String limpio = valor == null ? "" : valor.strip();
         exigir(!limpio.isEmpty(), "Completa el campo " + campo + ".");
@@ -28,6 +30,7 @@ public final class Validador {
         return limpio;
     }
 
+    // Conversión de números
     public static int entero(String valor, String campo) {
         try {
             return Integer.parseInt(texto(valor, campo));
@@ -36,6 +39,7 @@ public final class Validador {
         }
     }
 
+    // Conversión de importes
     public static int centimos(String valor) {
         try {
             return new BigDecimal(texto(valor, "importe").replace(',', '.'))
@@ -49,6 +53,7 @@ public final class Validador {
         return String.format(Locale.ROOT, "S/ %.2f", BigDecimal.valueOf(centimos, 2));
     }
 
+    // Validación de fechas y horarios
     public static LocalDate fecha(String valor) {
         try {
             return LocalDate.parse(texto(valor, "fecha"));

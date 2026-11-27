@@ -1,12 +1,14 @@
 package modelo;
 
 public final class Sede {
+    // Atributos
     private final int id;
     private final String nombre;
     private final String direccion;
     private final int capacidad;
     private final int presentes;
 
+    // Constructor
     public Sede(int id, String nombre, String direccion, int capacidad, int presentes) {
         this.id = id;
         this.nombre = nombre;
@@ -15,6 +17,7 @@ public final class Sede {
         this.presentes = presentes;
     }
 
+    // Getters
     public int getId() {
         return id;
     }

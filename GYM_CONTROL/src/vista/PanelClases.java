@@ -3,33 +3,35 @@ package vista;
 import controlador.GymControlador;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
-import java.util.List;
 import java.util.ArrayList;
-import javax.swing.JComboBox;
-import javax.swing.JTextField;
+import java.util.List;
 import javax.swing.DefaultListModel;
+import javax.swing.JComboBox;
 import javax.swing.JList;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
+import javax.swing.JTextField;
+import modelo.ClaseGrupal.Entrenador;
+import modelo.ClaseGrupal.ReservaClase;
 import modelo.ClaseGrupal;
-import modelo.Entrenador;
 import modelo.EstadoGym;
-import modelo.ReservaClase;
-import modelo.Socio;
 import modelo.Sede;
+import modelo.Socio;
 
 final class PanelClases extends PanelModulo {
     private final GymControlador controlador;
-    private final Tabla<Entrenador> entrenadores = new Tabla<>(Tabla.numero("ID", Entrenador::getId),
-            Tabla.texto("Entrenador", Entrenador::toString), Tabla.texto("Especialidad", Entrenador::getEspecialidad),
-            Tabla.texto("Teléfono", Entrenador::getTelefono), Tabla.texto("Disponibilidad", Entrenador::getDisponibilidad));
-    private final Tabla<ClaseGrupal> clases = new Tabla<>(Tabla.texto("Clase", ClaseGrupal::getNombre),
-            Tabla.texto("Entrenador", ClaseGrupal::getEntrenador), Tabla.texto("Sede", ClaseGrupal::getSede),
+    // Tablas y lista de participantes
+    private final Tabla<Entrenador> entrenadores = new Tabla<>(Tabla.numero("ID", elemento -> elemento.getId()),
+            Tabla.texto("Entrenador", elemento -> elemento.toString()), Tabla.texto("Especialidad", elemento -> elemento.getEspecialidad()),
+            Tabla.texto("Teléfono", elemento -> elemento.getTelefono()), Tabla.texto("Disponibilidad", elemento -> elemento.getDisponibilidad()));
+    private final Tabla<ClaseGrupal> clases = new Tabla<>(Tabla.texto("Clase", elemento -> elemento.getNombre()),
+            Tabla.texto("Entrenador", elemento -> elemento.getEntrenador()), Tabla.texto("Sede", elemento -> elemento.getSede()),
             Tabla.texto("Horario", c -> c.getHorario().toString().replace('T', ' ')),
-            Tabla.numero("Capacidad", ClaseGrupal::getCapacidad), Tabla.numero("Libres", ClaseGrupal::disponibles));
+            Tabla.numero("Capacidad", elemento -> elemento.getCapacidad()), Tabla.numero("Libres", elemento -> elemento.disponibles()));
     private final DefaultListModel<ReservaClase> reservas = new DefaultListModel<>();
     private final JList<ReservaClase> participantes = new JList<>(reservas);
 
+    // Constructor y eventos
     PanelClases(GymControlador controlador) {
         super("Entrenadores y clases", "Programa sesiones grupales y administra sus cupos.");
         this.controlador = controlador;
@@ -38,13 +40,13 @@ final class PanelClases extends PanelModulo {
             Entrenador entrenador = seleccion(entrenadores, "un entrenador");
             if (entrenador != null) entrenador(entrenador);
         });
-        accion("Nueva clase", true, this::nuevaClase);
-        accion("Reservar cupo", false, this::reservar);
-        accion("Cancelar reserva", false, this::cancelar);
+        accion("Nueva clase", true, () -> nuevaClase());
+        accion("Reservar cupo", false, () -> reservar());
+        accion("Cancelar reserva", false, () -> cancelar());
 
-        var listado = seccion("Entrenadores", entrenadores);
+        javax.swing.JPanel listado = seccion("Entrenadores", entrenadores);
         listado.setPreferredSize(new Dimension(500, 180));
-        var lista = seccion("Participantes", new JScrollPane(participantes));
+        javax.swing.JPanel lista = seccion("Participantes", new JScrollPane(participantes));
         lista.setPreferredSize(new Dimension(230, 120));
         JSplitPane detalle = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, seccion("Clases grupales", clases), lista);
         detalle.setResizeWeight(0.76);
@@ -52,10 +54,11 @@ final class PanelClases extends PanelModulo {
         JSplitPane dividido = new JSplitPane(JSplitPane.VERTICAL_SPLIT, listado, detalle);
         dividido.setResizeWeight(0.40);
         dividido.setBorder(null);
-        clases.alSeleccionar(this::mostrarParticipantes);
+        clases.alSeleccionar(() -> mostrarParticipantes());
         add(dividido, BorderLayout.CENTER);
     }
 
+    // Formulario de entrenador
     private void entrenador(Entrenador entrenador) {
         Formulario formulario = new Formulario();
         JTextField nombres = formulario.texto("Nombres", entrenador == null ? "" : entrenador.getNombres());
@@ -69,6 +72,7 @@ final class PanelClases extends PanelModulo {
         }
     }
 
+    // Formulario de clase
     private void nuevaClase() {
         if (estado == null || !disponible(!estado.getEntrenadores().isEmpty() && !estado.getSedes().isEmpty(),
                 "Primero registra una sede y un entrenador.")) return;
@@ -83,6 +87,7 @@ final class PanelClases extends PanelModulo {
         }
     }
 
+    // Reserva y cancelación
     private void reservar() {
         ClaseGrupal clase = seleccion(clases, "una clase");
         if (clase == null) return;
@@ -105,6 +110,7 @@ final class PanelClases extends PanelModulo {
         }
     }
 
+    // Lista de participantes
     private void mostrarParticipantes() {
         ClaseGrupal clase = clases.seleccion();
         reservas.clear();
@@ -114,11 +120,12 @@ final class PanelClases extends PanelModulo {
         }
     }
 
+    // Observer: actualización del panel
     @Override
     public void gymActualizado(EstadoGym estado) {
         this.estado = estado;
-        entrenadores.mostrar(estado.getEntrenadores(), Entrenador::getId);
-        clases.mostrar(estado.getClases(), ClaseGrupal::getId);
+        entrenadores.mostrar(estado.getEntrenadores(), elemento -> elemento.getId());
+        clases.mostrar(estado.getClases(), elemento -> elemento.getId());
         mostrarParticipantes();
     }
 }

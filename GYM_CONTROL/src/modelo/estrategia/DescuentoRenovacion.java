@@ -4,6 +4,7 @@ import modelo.Membresia;
 import modelo.Validador;
 
 public final class DescuentoRenovacion implements EstrategiaPrecio {
+    // Porcentaje de descuento
     private static final int DESCUENTO = 5;
 
     @Override
@@ -11,6 +12,7 @@ public final class DescuentoRenovacion implements EstrategiaPrecio {
         return "Renovación anticipada (" + DESCUENTO + " %)";
     }
 
+    // Cálculo y validación de la renovación
     @Override
     public int calcular(Contexto contexto) {
         Membresia anterior = contexto.getAnterior();

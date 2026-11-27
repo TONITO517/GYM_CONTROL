@@ -15,15 +15,17 @@ import modelo.Sede;
 
 final class PanelAccesos extends PanelModulo {
     private final GymControlador controlador;
+    // Componentes de acceso
     private final JTextField dni = new JTextField(10);
     private final JComboBox<Sede> sedes = new JComboBox<>();
     private final JLabel aforo = detalle("Selecciona una sede.");
     private final JLabel resultado = detalle(" ");
-    private final Tabla<Asistencia> asistencias = new Tabla<>(Tabla.numero("ID", Asistencia::getId),
-            Tabla.texto("Socio", Asistencia::getSocio), Tabla.texto("Sede", Asistencia::getSede),
-            Tabla.numero("Membresía", Asistencia::getMembresiaId), Tabla.texto("Entrada", a -> hora(a.getEntrada())),
+    private final Tabla<Asistencia> asistencias = new Tabla<>(Tabla.numero("ID", elemento -> elemento.getId()),
+            Tabla.texto("Socio", elemento -> elemento.getSocio()), Tabla.texto("Sede", elemento -> elemento.getSede()),
+            Tabla.numero("Membresía", elemento -> elemento.getMembresiaId()), Tabla.texto("Entrada", a -> hora(a.getEntrada())),
             Tabla.texto("Salida", a -> hora(a.getSalida())));
 
+    // Constructor y eventos
     PanelAccesos(GymControlador controlador) {
         super("Accesos y asistencias", "Valida la entrada por DNI. Registra la salida en la misma sede.");
         this.controlador = controlador;
@@ -50,6 +52,7 @@ final class PanelAccesos extends PanelModulo {
         return fecha == null ? "Dentro de la sede" : fecha.withNano(0).toString().replace('T', ' ');
     }
 
+    // Registro de entrada o salida
     private void registrar(boolean entrada) {
         Sede sede = (Sede) sedes.getSelectedItem();
         if (!disponible(sede != null, "Selecciona una sede.")) return;
@@ -57,6 +60,7 @@ final class PanelAccesos extends PanelModulo {
         else controlador.salida(dni.getText(), sede.getId());
     }
 
+    // Visualización del aforo
     private void mostrarAforo() {
         Sede sede = (Sede) sedes.getSelectedItem();
         aforo.setText(sede == null ? "Selecciona una sede."
@@ -66,14 +70,15 @@ final class PanelAccesos extends PanelModulo {
 
     void resultado(String mensaje, boolean error) {
         resultado.setText(mensaje);
-        resultado.setForeground(error ? new java.awt.Color(164, 43, 52) : Tema.VERDE);
+        resultado.setForeground(error ? new java.awt.Color(164, 43, 52) : PanelModulo.VERDE);
     }
 
+    // Observer: actualización del panel
     @Override
     public void gymActualizado(EstadoGym estado) {
         this.estado = estado;
         Sede previa = (Sede) sedes.getSelectedItem();
-        sedes.setModel(new DefaultComboBoxModel<>(estado.getSedes().toArray(Sede[]::new)));
+        sedes.setModel(new DefaultComboBoxModel<>(estado.getSedes().toArray(new Sede[0])));
         if (previa != null) {
             for (Sede sede : estado.getSedes()) {
                 if (sede.getId() == previa.getId()) {
@@ -83,6 +88,6 @@ final class PanelAccesos extends PanelModulo {
             }
         }
         mostrarAforo();
-        asistencias.mostrar(estado.getAsistencias(), Asistencia::getId);
+        asistencias.mostrar(estado.getAsistencias(), elemento -> elemento.getId());
     }
 }

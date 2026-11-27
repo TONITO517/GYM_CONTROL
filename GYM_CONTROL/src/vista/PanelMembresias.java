@@ -4,32 +4,36 @@ import controlador.GymControlador;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import javax.swing.JComboBox;
 import javax.swing.JList;
-import javax.swing.JTextField;
 import javax.swing.JSplitPane;
+import javax.swing.JTextField;
 import modelo.EstadoGym;
+import modelo.Membresia.Congelamiento;
 import modelo.Membresia;
+import modelo.Pago;
 import modelo.Plan;
 import modelo.Sede;
 import modelo.Socio;
 import modelo.Validador;
-import modelo.Congelamiento;
 import modelo.estrategia.EstrategiaPrecio;
 
 final class PanelMembresias extends PanelModulo {
     private final GymControlador controlador;
-    private final Tabla<Plan> planes = new Tabla<>(Tabla.numero("ID", Plan::getId), Tabla.texto("Plan", Plan::getNombre),
-            Tabla.numero("Meses", Plan::getMeses), Tabla.texto("Precio base", plan -> Validador.soles(plan.getPrecio())),
-            Tabla.texto("Sedes permitidas", this::nombresSedes));
-    private final Tabla<Membresia> membresias = new Tabla<>(Tabla.numero("ID", Membresia::getId),
-            Tabla.texto("Socio", Membresia::getSocio), Tabla.texto("Plan", Membresia::getPlan),
-            Tabla.texto("Inicio", Membresia::getInicio), Tabla.texto("Vencimiento", Membresia::getVencimiento),
+    // Tablas de planes y membresías
+    private final Tabla<Plan> planes = new Tabla<>(Tabla.numero("ID", elemento -> elemento.getId()), Tabla.texto("Plan", elemento -> elemento.getNombre()),
+            Tabla.numero("Meses", elemento -> elemento.getMeses()), Tabla.texto("Precio base", plan -> Validador.soles(plan.getPrecio())),
+            Tabla.texto("Sedes permitidas", plan -> nombresSedes(plan)));
+    private final Tabla<Membresia> membresias = new Tabla<>(Tabla.numero("ID", elemento -> elemento.getId()),
+            Tabla.texto("Socio", elemento -> elemento.getSocio()), Tabla.texto("Plan", elemento -> elemento.getPlan()),
+            Tabla.texto("Inicio", elemento -> elemento.getInicio()), Tabla.texto("Vencimiento", elemento -> elemento.getVencimiento()),
             Tabla.texto("Precio acordado", m -> Validador.soles(m.getPrecio())),
-            Tabla.texto("Tarifa", Membresia::getTarifa), Tabla.texto("Estado", m -> m.vigencia(estado.hoy()).name().replace('_', ' ')));
+            Tabla.texto("Tarifa", elemento -> elemento.getTarifa()), Tabla.texto("Estado", m -> m.vigencia(estado.hoy()).name().replace('_', ' ')));
 
+    // Constructor y eventos
     PanelMembresias(GymControlador controlador) {
         super("Planes y membresías", "Define precios y sedes. Consulta el historial y renueva o congela membresías.");
         this.controlador = controlador;
@@ -43,14 +47,14 @@ final class PanelMembresias extends PanelModulo {
             Membresia membresia = seleccion(membresias, "una membresía");
             if (membresia != null) formularioMembresia(membresia);
         });
-        accion("Congelar", false, this::congelar);
+        accion("Congelar", false, () -> congelar());
         accion("Reactivar", false, () -> {
             Membresia membresia = seleccion(membresias, "una membresía");
             if (membresia != null) controlador.reactivar(membresia.getId());
         });
-        accion("Ver congelamiento", false, this::verCongelamiento);
+        accion("Ver congelamiento", false, () -> verCongelamiento());
 
-        var catalogo = seccion("Planes disponibles", planes);
+        javax.swing.JPanel catalogo = seccion("Planes disponibles", planes);
         catalogo.setPreferredSize(new Dimension(500, 160));
         JSplitPane dividido = new JSplitPane(JSplitPane.VERTICAL_SPLIT, catalogo,
                 seccion("Historial de membresías", membresias));
@@ -79,6 +83,7 @@ final class PanelMembresias extends PanelModulo {
         return sedes;
     }
 
+    // Formulario de planes
     private void formularioPlan(Plan plan) {
         if (estado == null || !disponible(!estado.getSedes().isEmpty(), "Primero registra una sede.")) return;
         Formulario formulario = new Formulario();
@@ -97,6 +102,7 @@ final class PanelMembresias extends PanelModulo {
         }
     }
 
+    // Contratación y renovación
     private void formularioMembresia(Membresia anterior) {
         if (estado == null || !disponible(!estado.getPlanes().isEmpty(), "Primero registra un plan.")) return;
         List<Socio> socios = new ArrayList<>();
@@ -118,6 +124,7 @@ final class PanelMembresias extends PanelModulo {
             }
         }
         JComboBox<Plan> plan = formulario.elegir("Plan", estado.getPlanes(), planActual);
+        // Strategy: selección de tarifa
         JComboBox<EstrategiaPrecio> tarifa = formulario.elegir("Tarifa", controlador.estrategias(), null);
         if (anterior == null) {
             JTextField inicio = formulario.texto("Fecha de inicio (AAAA-MM-DD)", estado.hoy().toString());
@@ -131,6 +138,7 @@ final class PanelMembresias extends PanelModulo {
         }
     }
 
+    // Congelamiento de membresías
     private void congelar() {
         Membresia membresia = seleccion(membresias, "una membresía");
         if (membresia == null) return;
@@ -154,10 +162,79 @@ final class PanelMembresias extends PanelModulo {
         }
     }
 
+    // Observer: actualización de membresías
     @Override
     public void gymActualizado(EstadoGym estado) {
         this.estado = estado;
-        planes.mostrar(estado.getPlanes(), Plan::getId);
-        membresias.mostrar(estado.getMembresias(), Membresia::getId);
+        planes.mostrar(estado.getPlanes(), elemento -> elemento.getId());
+        membresias.mostrar(estado.getMembresias(), elemento -> elemento.getId());
+    }
+}
+
+// Panel relacionado: PanelPagos
+final class PanelPagos extends PanelModulo {
+    private final GymControlador controlador;
+    private final Tabla<Membresia> saldos = new Tabla<>(Tabla.numero("Membresía", elemento -> elemento.getId()),
+            Tabla.texto("Socio", elemento -> elemento.getSocio()), Tabla.texto("Plan", elemento -> elemento.getPlan()),
+            Tabla.texto("Importe", m -> Validador.soles(m.getPrecio())),
+            Tabla.texto("Total pagado", m -> Validador.soles(m.getPagado())),
+            Tabla.texto("Saldo", m -> Validador.soles(m.saldo())), Tabla.texto("Estado", elemento -> elemento.estadoPago()));
+    private final Tabla<Pago> historial = new Tabla<>(Tabla.numero("ID", elemento -> elemento.getId()),
+            Tabla.texto("Fecha y hora", p -> p.getFecha().withNano(0).toString().replace('T', ' ')),
+            Tabla.texto("Monto", p -> Validador.soles(p.getMonto())), Tabla.texto("Método", elemento -> elemento.getMetodo()));
+
+    // Constructor del panel de pagos
+    PanelPagos(GymControlador controlador) {
+        super("Pagos", "Registra abonos y consulta el historial. El acceso exige un mínimo pagado del 50 %.");
+        this.controlador = controlador;
+        accion("Registrar abono", true, () -> pagar(false));
+        accion("Pagar saldo completo", false, () -> pagar(true));
+        javax.swing.JPanel resumen = seccion("Saldos por membresía", saldos);
+        resumen.setPreferredSize(new Dimension(500, 220));
+        JSplitPane dividido = new JSplitPane(JSplitPane.VERTICAL_SPLIT, resumen,
+                seccion("Abonos de la membresía seleccionada", historial));
+        dividido.setBorder(null);
+        dividido.setResizeWeight(0.58);
+        saldos.alSeleccionar(() -> mostrarHistorial());
+        add(dividido, BorderLayout.CENTER);
+    }
+
+    // Registro de pagos
+    private void pagar(boolean saldoCompleto) {
+        Membresia membresia = seleccion(saldos, "una membresía");
+        if (membresia == null || !disponible(membresia.saldo() > 0, "La membresía ya está pagada.")) return;
+        Formulario formulario = new Formulario();
+        JComboBox<Pago.Metodo> metodo = formulario.elegir("Método de pago", Arrays.asList(Pago.Metodo.values()), null);
+        String titulo = "#" + membresia.getId() + " · " + membresia.getSocio() + " · saldo " + Validador.soles(membresia.saldo());
+        if (saldoCompleto) {
+            if (formulario.aceptar(this, "Pagar saldo completo · " + titulo)) {
+                controlador.pagar(membresia.getId(), "", Formulario.elegido(metodo), true);
+            }
+        } else {
+            JTextField monto = formulario.texto("Monto del abono (S/)", "");
+            if (formulario.aceptar(this, "Registrar abono · " + titulo)) {
+                controlador.pagar(membresia.getId(), monto.getText(), Formulario.elegido(metodo), false);
+            }
+        }
+    }
+
+    // Historial de pagos
+    private void mostrarHistorial() {
+        Membresia actual = saldos.seleccion();
+        List<Pago> filas = new ArrayList<>();
+        if (actual != null) {
+            for (Pago pago : estado.getPagos()) {
+                if (pago.getMembresiaId() == actual.getId()) filas.add(pago);
+            }
+        }
+        historial.mostrar(filas, elemento -> elemento.getId());
+    }
+
+    // Observer: actualización de pagos
+    @Override
+    public void gymActualizado(EstadoGym estado) {
+        this.estado = estado;
+        saldos.mostrar(estado.getMembresias(), elemento -> elemento.getId());
+        mostrarHistorial();
     }
 }
